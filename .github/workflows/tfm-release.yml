@@ -188,7 +188,6 @@ jobs:
         run: ccache --show-stats
 
       - name: Package (DMG)
-        working-directory: build
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
@@ -292,7 +291,6 @@ jobs:
         run: ccache --show-stats
 
       - name: Package (DMG)
-        working-directory: build
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 30
