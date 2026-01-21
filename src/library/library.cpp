@@ -24,6 +24,7 @@
 #include "library/rhythmbox/rhythmboxfeature.h"
 #include "library/serato/seratofeature.h"
 #include "library/sidebarmodel.h"
+#include "library/tfm/tfmfeature.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "library/trackmodel.h"
@@ -215,6 +216,13 @@ Library::Library(
     if (m_pConfig->getValue(
                 ConfigKey(kConfigGroup, "ShowSeratoLibrary"), true)) {
         addFeature(new SeratoFeature(this, m_pConfig));
+    }
+
+    // TelegramFileManager integration - always available (network-based)
+    if (TFMFeature::isSupported() &&
+            m_pConfig->getValue(
+                    ConfigKey(kConfigGroup, "ShowTFMLibrary"), true)) {
+        addFeature(new TFMFeature(this, m_pConfig));
     }
 
     for (const auto& externalTrackCollection : m_pTrackCollectionManager->externalCollections()) {

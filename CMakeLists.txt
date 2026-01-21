@@ -1452,6 +1452,10 @@ add_library(
   src/library/searchqueryparser.cpp
   src/library/serato/seratofeature.cpp
   src/library/serato/seratoplaylistmodel.cpp
+  src/library/tfm/tfmapiclient.cpp
+  src/library/tfm/tfmfeature.cpp
+  src/library/tfm/tfmplaylistmodel.cpp
+  src/library/tfm/tfmtrackmodel.cpp
   src/library/sidebarmodel.cpp
   src/library/starrating.cpp
   src/library/tabledelegates/bpmdelegate.cpp

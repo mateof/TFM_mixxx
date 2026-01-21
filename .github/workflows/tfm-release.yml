@@ -1,0 +1,395 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow
+name: TFM Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: write
+
+env:
+  MIXXX_VERSION: ${{ github.ref_name }}
+
+jobs:
+  build-windows:
+    name: Windows x64 (MSI)
+    runs-on: windows-2022
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch origin --force --tags
+
+      - name: Set up cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.21.x"
+
+      - name: Set up MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Get build environment name
+        run: tools/windows_buildenv.bat name
+
+      - name: Set up build environment cache
+        uses: actions/cache@v4
+        with:
+          path: C:\buildenv
+          key: windows-2022-buildenv-${{ env.BUILDENV_NAME }}
+
+      - name: Set up build environment
+        shell: cmd
+        run: tools/windows_buildenv.bat setup
+        env:
+          BUILDENV_BASEPATH: C:\buildenv
+          BUILDENV_RELEASE: TRUE
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Configure
+        working-directory: build
+        run: >-
+          cmake
+          -DBULK=ON
+          -DHSS1394=ON
+          -DLOCALECOMPARE=ON
+          -DMAD=ON
+          -DMEDIAFOUNDATION=ON
+          -DMODPLUG=ON
+          -DQT6=ON
+          -DQML=ON
+          -DWAVPACK=ON
+          -DVCPKG_TARGET_TRIPLET=x64-windows-release
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
+          -DWARNINGS_FATAL=ON
+          -DDEBUG_ASSERTIONS_FATAL=OFF
+          -DBATTERY=ON
+          -DBROADCAST=ON
+          -DHID=ON
+          -DKEYFINDER=ON
+          -DLILV=ON
+          -DOPUS=ON
+          -DQTKEYCHAIN=ON
+          -DVINYLCONTROL=ON
+          ..
+        env:
+          CC: cl
+          CXX: cl
+
+      - name: Build
+        working-directory: build
+        run: cmake --build . --config RelWithDebInfo
+
+      - name: Package (MSI)
+        working-directory: build
+        run: cpack -G WIX -V
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mixxx-${{ github.ref_name }}-windows-x64
+          path: build/*.msi
+
+  build-macos-intel:
+    name: macOS Intel (DMG)
+    runs-on: macos-13
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch origin --force --tags
+
+      - name: Set up cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.21.x"
+
+      - name: Install ccache
+        run: brew install ccache
+
+      - name: Get build environment name
+        run: tools/macos_release_buildenv.sh name
+
+      - name: Set up build environment cache
+        uses: actions/cache@v4
+        with:
+          path: /Users/runner/buildenv
+          key: macos-13-buildenv-intel-${{ env.BUILDENV_NAME }}
+
+      - name: Set up build environment
+        run: tools/macos_release_buildenv.sh setup
+        env:
+          BUILDENV_BASEPATH: /Users/runner/buildenv
+
+      - name: Set up ccache
+        uses: actions/cache@v4
+        with:
+          path: /Users/runner/Library/Caches/ccache
+          key: macos-intel-ccache-${{ github.ref_name }}-${{ github.run_number }}
+          restore-keys: |
+            macos-intel-ccache-${{ github.ref_name }}
+            macos-intel-ccache-
+
+      - name: Configure ccache
+        run: |
+          ccache --zero-stats
+          ccache --max-size=2G
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Configure
+        working-directory: build
+        run: >-
+          cmake
+          -DBULK=ON
+          -DCOREAUDIO=ON
+          -DHSS1394=ON
+          -DMACOS_BUNDLE=ON
+          -DMODPLUG=ON
+          -DQT6=ON
+          -DQML=OFF
+          -DWAVPACK=ON
+          -DVCPKG_TARGET_TRIPLET=x64-osx-min1100-release
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
+          -DWARNINGS_FATAL=ON
+          -DDEBUG_ASSERTIONS_FATAL=OFF
+          -DBATTERY=ON
+          -DBROADCAST=ON
+          -DHID=ON
+          -DKEYFINDER=ON
+          -DLILV=ON
+          -DOPUS=ON
+          -DQTKEYCHAIN=ON
+          -DVINYLCONTROL=ON
+          ..
+
+      - name: Build
+        working-directory: build
+        run: cmake --build . --config RelWithDebInfo
+        env:
+          CCACHE_NOCOMPRESS: true
+
+      - name: Print ccache stats
+        run: ccache --show-stats
+
+      - name: Package (DMG)
+        working-directory: build
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 12
+          retry_wait_seconds: 1
+          command: |
+            cd build
+            cpack -G DragNDrop -V
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mixxx-${{ github.ref_name }}-macos-intel
+          path: build/*.dmg
+
+  build-macos-arm:
+    name: macOS Apple Silicon (DMG)
+    runs-on: macos-14
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch origin --force --tags
+
+      - name: Set up cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.21.x"
+
+      - name: Install ccache
+        run: brew install ccache
+
+      - name: Get build environment name
+        run: tools/macos_release_buildenv.sh name
+
+      - name: Set up build environment cache
+        uses: actions/cache@v4
+        with:
+          path: /Users/runner/buildenv
+          key: macos-14-buildenv-arm-${{ env.BUILDENV_NAME }}
+
+      - name: Set up build environment
+        run: tools/macos_release_buildenv.sh setup
+        env:
+          BUILDENV_BASEPATH: /Users/runner/buildenv
+
+      - name: Set up ccache
+        uses: actions/cache@v4
+        with:
+          path: /Users/runner/Library/Caches/ccache
+          key: macos-arm-ccache-${{ github.ref_name }}-${{ github.run_number }}
+          restore-keys: |
+            macos-arm-ccache-${{ github.ref_name }}
+            macos-arm-ccache-
+
+      - name: Configure ccache
+        run: |
+          ccache --zero-stats
+          ccache --max-size=2G
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Configure
+        working-directory: build
+        run: >-
+          cmake
+          -DBULK=ON
+          -DCOREAUDIO=ON
+          -DHSS1394=ON
+          -DMACOS_BUNDLE=ON
+          -DMODPLUG=ON
+          -DQT6=ON
+          -DQML=ON
+          -DWAVPACK=ON
+          -DVCPKG_TARGET_TRIPLET=arm64-osx-min1100-release
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
+          -DWARNINGS_FATAL=ON
+          -DDEBUG_ASSERTIONS_FATAL=OFF
+          -DBATTERY=ON
+          -DBROADCAST=ON
+          -DHID=ON
+          -DKEYFINDER=ON
+          -DLILV=ON
+          -DOPUS=ON
+          -DQTKEYCHAIN=ON
+          -DVINYLCONTROL=ON
+          ..
+
+      - name: Build
+        working-directory: build
+        run: cmake --build . --config RelWithDebInfo
+        env:
+          CCACHE_NOCOMPRESS: true
+
+      - name: Print ccache stats
+        run: ccache --show-stats
+
+      - name: Package (DMG)
+        working-directory: build
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 12
+          retry_wait_seconds: 1
+          command: |
+            cd build
+            cpack -G DragNDrop -V
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mixxx-${{ github.ref_name }}-macos-arm
+          path: build/*.dmg
+
+  build-linux-flatpak:
+    name: Linux (Flatpak)
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:kde-6.7
+      options: --privileged
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch origin --force --tags
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: mixxx-${{ github.ref_name }}-linux.flatpak
+          manifest-path: packaging/flatpak/org.mixxx.Mixxx.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mixxx-${{ github.ref_name }}-linux-flatpak
+          path: mixxx-${{ github.ref_name }}-linux.flatpak
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-macos-intel, build-macos-arm, build-linux-flatpak]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          find artifacts -type f \( -name "*.msi" -o -name "*.dmg" -o -name "*.flatpak" \) -exec cp {} release-files/ \;
+          ls -la release-files/
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          echo "## Mixxx ${{ github.ref_name }}" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Downloads" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "| Platform | Architecture | Format |" >> RELEASE_NOTES.md
+          echo "|----------|--------------|--------|" >> RELEASE_NOTES.md
+          echo "| Windows | x64 | MSI Installer |" >> RELEASE_NOTES.md
+          echo "| macOS | Intel (x64) | DMG |" >> RELEASE_NOTES.md
+          echo "| macOS | Apple Silicon (ARM64) | DMG |" >> RELEASE_NOTES.md
+          echo "| Linux | x64 | Flatpak |" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Installation" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "**Windows:** Download and run the MSI installer." >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "**macOS:** Download the DMG file for your Mac's architecture, open it, and drag Mixxx to your Applications folder." >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "**Linux:** Install using Flatpak:" >> RELEASE_NOTES.md
+          echo "\`\`\`bash" >> RELEASE_NOTES.md
+          echo "flatpak install mixxx-${{ github.ref_name }}-linux.flatpak" >> RELEASE_NOTES.md
+          echo "\`\`\`" >> RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Mixxx ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: release-files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

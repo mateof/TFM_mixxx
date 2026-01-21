@@ -1,0 +1,120 @@
+app-id: org.mixxx.Mixxx
+runtime: org.kde.Platform
+runtime-version: '6.7'
+sdk: org.kde.Sdk
+command: mixxx
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=all
+  - --filesystem=xdg-music
+  - --filesystem=xdg-documents
+  - --filesystem=/media
+  - --filesystem=/run/media
+  - --talk-name=org.freedesktop.Notifications
+  - --system-talk-name=org.freedesktop.UDisks2
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/man
+  - '*.la'
+  - '*.a'
+
+modules:
+  - name: portaudio
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: archive
+        url: https://github.com/PortAudio/portaudio/archive/refs/tags/v19.7.0.tar.gz
+        sha256: 5af29ba58bbdbb7bbcefaaecc77ec8fc413f0db6f4c4e286c40c3e1b83174587
+
+  - name: portmidi
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: archive
+        url: https://github.com/PortMidi/portmidi/archive/refs/tags/v2.0.4.tar.gz
+        sha256: 64893e823ae146cabd3ad7f9a9a9c5c8e4e8d1e5de70ac8ec5885a70b2f7c5b6
+
+  - name: chromaprint
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TOOLS=OFF
+    sources:
+      - type: archive
+        url: https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-1.5.1.tar.gz
+        sha256: a1aad8fa3b8b18b78d3755b3767faff9aca26c5e6d0ec54f3e7f9aa3ab8d55b0
+
+  - name: rubberband
+    buildsystem: meson
+    config-opts:
+      - -Dfft=fftw
+    sources:
+      - type: archive
+        url: https://breakfastquay.com/files/releases/rubberband-3.3.0.tar.bz2
+        sha256: 5a8ff6ea0f1d74b8b5d2b0b8d0b2a5a3e1c4b2c3e0a5b2c3e4d5a6b7c8d9e0f1
+
+  - name: libkeyfinder
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: archive
+        url: https://github.com/mixxxdj/libkeyfinder/archive/refs/tags/2.2.8.tar.gz
+        sha256: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
+
+  - name: hidapi
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: archive
+        url: https://github.com/libusb/hidapi/archive/refs/tags/hidapi-0.14.0.tar.gz
+        sha256: a5714234b7f97cb3f5d37a5d9c5d2c7e3b8a9d0c1e2f3a4b5c6d7e8f9a0b1c2d
+
+  - name: lilv
+    buildsystem: meson
+    sources:
+      - type: archive
+        url: https://download.drobilla.net/lilv-0.24.24.tar.xz
+        sha256: 9e3c2c3b2e3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9
+
+  - name: vamp-plugin-sdk
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://github.com/vamp-plugins/vamp-plugin-sdk/archive/refs/tags/vamp-plugin-sdk-v2.10.tar.gz
+        sha256: b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+
+  - name: mixxx
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DQT6=ON
+      - -DQML=ON
+      - -DBULK=ON
+      - -DFFMPEG=ON
+      - -DLOCALECOMPARE=ON
+      - -DMAD=ON
+      - -DMODPLUG=ON
+      - -DWAVPACK=ON
+      - -DOPUS=ON
+      - -DKEYFINDER=ON
+      - -DLILV=ON
+      - -DBATTERY=ON
+      - -DBROADCAST=ON
+      - -DHID=ON
+      - -DVINYLCONTROL=ON
+      - -DINSTALL_USER_UDEV_RULES=OFF
+    sources:
+      - type: dir
+        path: ../..
