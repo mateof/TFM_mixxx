@@ -102,7 +102,7 @@ jobs:
 
   build-macos-intel:
     name: macOS Intel (DMG)
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -127,7 +127,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /Users/runner/buildenv
-          key: macos-13-buildenv-intel-${{ env.BUILDENV_NAME }}
+          key: macos-15-intel-buildenv-${{ env.BUILDENV_NAME }}
 
       - name: Set up build environment
         run: tools/macos_release_buildenv.sh setup
@@ -317,6 +317,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Fix git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Fetch all tags
         run: git fetch origin --force --tags

@@ -77,6 +77,7 @@ void TFMApiClient::fetchChannels() {
 }
 
 void TFMApiClient::fetchChannelTracks(const QString& channelId, int offset, int limit) {
+    Q_UNUSED(offset);
     qWarning() << "TFMApiClient::fetchChannelTracks - channelId:" << channelId;
 
     if (m_serverUrl.isEmpty()) {
@@ -110,6 +111,7 @@ void TFMApiClient::fetchChannelTracksPage(const QString& channelId, int page, in
 }
 
 void TFMApiClient::fetchFolderContents(const QString& channelId, const QString& folderId, int offset, int limit) {
+    Q_UNUSED(offset);
     qWarning() << "TFMApiClient::fetchFolderContents - channelId:" << channelId << "folderId:" << folderId;
 
     if (m_serverUrl.isEmpty()) {
